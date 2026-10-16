@@ -1,8 +1,10 @@
 from typing import Annotated, Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
+
+from app.ratelimit import limit_search
 
 OPEN_LIBRARY_SEARCH_URL = "https://openlibrary.org/search.json"
 _FIELDS = "key,title,author_name,number_of_pages_median,first_publish_year"
@@ -32,7 +34,7 @@ def normalize(doc: dict[str, Any]) -> SearchResult | None:
     )
 
 
-@router.get("/search", response_model=list[SearchResult])
+@router.get("/search", response_model=list[SearchResult], dependencies=[Depends(limit_search)])
 async def search(
     request: Request,
     q: Annotated[str, Query(min_length=1, max_length=200)],
