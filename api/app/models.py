@@ -4,6 +4,8 @@ from enum import StrEnum
 from sqlalchemy import JSON, CheckConstraint, Column, ForeignKey, Integer
 from sqlmodel import Field, SQLModel
 
+from app.types import UTCDateTime
+
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -30,8 +32,8 @@ class Book(SQLModel, table=True):
     tags: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     started_at: date | None = None
     finished_at: date | None = None
-    created_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 
 class Note(SQLModel, table=True):
@@ -42,8 +44,8 @@ class Note(SQLModel, table=True):
     body: str
     page: int | None = None
     chapter: str | None = None
-    created_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    updated_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 
 class Quote(SQLModel, table=True):
@@ -53,4 +55,4 @@ class Quote(SQLModel, table=True):
     book_id: int = Field(sa_column=Column(Integer, ForeignKey("books.id", ondelete="CASCADE"), nullable=False, index=True))
     text: str
     page: int | None = None
-    created_at: datetime = Field(default_factory=utcnow)
+    created_at: datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
