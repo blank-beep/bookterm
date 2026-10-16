@@ -112,3 +112,72 @@ def test_invalid_book_payloads_rejected(client: TestClient, body: dict[str, obje
 
 def test_note_on_missing_book_is_404(client: TestClient) -> None:
     assert client.post("/api/books/999/notes", headers=AUTH, json={"body": "x"}).status_code == 404
+
+
+def test_timestamps_serialize_as_utc_z(client: TestClient, book_id: int) -> None:
+    from datetime import datetime, timezone
+
+    def assert_z(obj: dict[str, object], *fields: str) -> None:
+        for f in fields:
+            value = obj[f]
+            assert isinstance(value, str) and value.endswith("Z"), (f, value)
+            assert datetime.fromisoformat(value).tzinfo == timezone.utc
+
+    assert_z(client.get(f"/api/books/{book_id}").json(), "created_at", "updated_at")
+    assert_z(client.get("/api/books").json()[0], "created_at", "updated_at")
+    assert_z(client.patch(f"/api/books/{book_id}", headers=AUTH, json={"rating": 3}).json(), "created_at", "updated_at")
+    assert_z(client.post(f"/api/books/{book_id}/notes", headers=AUTH, json={"body": "n"}).json(), "created_at", "updated_at")
+    assert_z(client.post(f"/api/books/{book_id}/quotes", headers=AUTH, json={"text": "q"}).json(), "created_at")
+
+
+@pytest.mark.parametrize("url_kind,body", [
+    ("book", {"title": None}), ("book", {"shelf": None}), ("book", {"authors": None}), ("book", {"tags": None}),
+    ("note", {"body": None}), ("quote", {"text": None}),
+])
+def test_patch_explicit_null_on_required_field_is_422(
+    client: TestClient, book_id: int, url_kind: str, body: dict[str, object]
+) -> None:
+    urls = {
+        "book": f"/api/books/{book_id}",
+        "note": f"/api/notes/{client.post(f'/api/books/{book_id}/notes', headers=AUTH, json={'body': 'n'}).json()['id']}",
+        "quote": f"/api/quotes/{client.post(f'/api/books/{book_id}/quotes', headers=AUTH, json={'text': 'q'}).json()['id']}",
+    }
+    assert client.patch(urls[url_kind], headers=AUTH, json=body).status_code == 422
+
+
+def test_patch_null_allowed_for_optional_fields(client: TestClient, book_id: int) -> None:
+    client.patch(f"/api/books/{book_id}", headers=AUTH, json={"rating": 4})
+    r = client.patch(f"/api/books/{book_id}", headers=AUTH, json={"rating": None})
+    assert r.status_code == 200 and r.json()["rating"] is None and r.json()["title"] == "Dune"
+
+
+def test_finished_before_started_rejected_on_create(client: TestClient) -> None:
+    r = client.post("/api/books", headers=AUTH, json={"title": "x", "started_at": "2026-10-10", "finished_at": "2026-10-01"})
+    assert r.status_code == 422
+    ok = client.post("/api/books", headers=AUTH, json={"title": "x", "started_at": "2026-10-10", "finished_at": "2026-10-10"})
+    assert ok.status_code == 201
+
+
+def test_finished_before_stored_started_rejected_on_update(client: TestClient, book_id: int) -> None:
+    assert client.patch(f"/api/books/{book_id}", headers=AUTH, json={"started_at": "2026-10-10"}).status_code == 200
+    assert client.patch(f"/api/books/{book_id}", headers=AUTH, json={"finished_at": "2026-10-01"}).status_code == 422
+    assert client.patch(f"/api/books/{book_id}", headers=AUTH, json={"finished_at": "2026-10-12"}).status_code == 200
+    assert client.patch(f"/api/books/{book_id}", headers=AUTH, json={"started_at": "2026-10-13"}).status_code == 422
+    assert client.get(f"/api/books/{book_id}").json()["started_at"] == "2026-10-10"
+
+
+@pytest.mark.parametrize("body", [
+    {"title": "x" * 501},
+    {"title": "x", "authors": ["a"] * 21},
+    {"title": "x", "authors": ["a" * 201]},
+    {"title": "x", "tags": ["t"] * 31},
+    {"title": "x", "tags": ["t" * 51]},
+])
+def test_oversize_book_fields_rejected(client: TestClient, body: dict[str, object]) -> None:
+    assert client.post("/api/books", headers=AUTH, json=body).status_code == 422
+
+
+def test_oversize_note_and_quote_rejected(client: TestClient, book_id: int) -> None:
+    assert client.post(f"/api/books/{book_id}/notes", headers=AUTH, json={"body": "x" * 50_001}).status_code == 422
+    assert client.post(f"/api/books/{book_id}/quotes", headers=AUTH, json={"text": "x" * 5_001}).status_code == 422
+    assert client.post(f"/api/books/{book_id}/notes", headers=AUTH, json={"body": "x" * 50_000}).status_code == 201

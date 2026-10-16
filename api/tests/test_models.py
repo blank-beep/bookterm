@@ -73,3 +73,34 @@ def test_note_for_missing_book_rejected(engine: Engine) -> None:
         s.add(Note(book_id=9999, body="orphan"))
         with pytest.raises(IntegrityError):
             s.commit()
+
+
+def test_datetimes_roundtrip_as_aware_utc(engine: Engine) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from app.types import iso_z
+
+    pacific = timezone(timedelta(hours=-7))
+    written = datetime(2026, 10, 15, 21, 42, 7, 123456, tzinfo=pacific)
+    with Session(engine) as s:
+        book = Book(title="Clock", created_at=written, updated_at=written)
+        s.add(book)
+        s.commit()
+        book_id = book.id
+
+    with Session(engine) as s:
+        got = s.get(Book, book_id)
+        assert got is not None
+        assert got.created_at.tzinfo == timezone.utc
+        assert got.created_at == written
+        assert got.created_at.utcoffset() == timedelta(0)
+        assert iso_z(got.created_at) == "2026-10-16T04:42:07.123456Z"
+
+
+def test_naive_datetime_rejected(engine: Engine) -> None:
+    from datetime import datetime
+
+    with Session(engine) as s:
+        s.add(Book(title="Naive", created_at=datetime(2026, 1, 1)))
+        with pytest.raises(Exception, match="naive datetime"):
+            s.commit()
