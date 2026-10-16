@@ -1,8 +1,9 @@
-from datetime import date, datetime
+from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import Shelf
+from app.types import UTCDatetimeJSON
 
 
 class _Strict(BaseModel):
@@ -36,8 +37,8 @@ class BookUpdate(_Strict):
 class BookRead(BookCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDatetimeJSON
+    updated_at: UTCDatetimeJSON
 
 
 class NoteCreate(_Strict):
@@ -56,8 +57,8 @@ class NoteRead(NoteCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
     book_id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDatetimeJSON
+    updated_at: UTCDatetimeJSON
 
 
 class QuoteCreate(_Strict):
@@ -74,4 +75,4 @@ class QuoteRead(QuoteCreate):
     model_config = ConfigDict(from_attributes=True)
     id: int
     book_id: int
-    created_at: datetime
+    created_at: UTCDatetimeJSON

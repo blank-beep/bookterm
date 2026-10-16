@@ -112,3 +112,19 @@ def test_invalid_book_payloads_rejected(client: TestClient, body: dict[str, obje
 
 def test_note_on_missing_book_is_404(client: TestClient) -> None:
     assert client.post("/api/books/999/notes", headers=AUTH, json={"body": "x"}).status_code == 404
+
+
+def test_timestamps_serialize_as_utc_z(client: TestClient, book_id: int) -> None:
+    from datetime import datetime, timezone
+
+    def assert_z(obj: dict[str, object], *fields: str) -> None:
+        for f in fields:
+            value = obj[f]
+            assert isinstance(value, str) and value.endswith("Z"), (f, value)
+            assert datetime.fromisoformat(value).tzinfo == timezone.utc
+
+    assert_z(client.get(f"/api/books/{book_id}").json(), "created_at", "updated_at")
+    assert_z(client.get("/api/books").json()[0], "created_at", "updated_at")
+    assert_z(client.patch(f"/api/books/{book_id}", headers=AUTH, json={"rating": 3}).json(), "created_at", "updated_at")
+    assert_z(client.post(f"/api/books/{book_id}/notes", headers=AUTH, json={"body": "n"}).json(), "created_at", "updated_at")
+    assert_z(client.post(f"/api/books/{book_id}/quotes", headers=AUTH, json={"text": "q"}).json(), "created_at")
