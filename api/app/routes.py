@@ -7,6 +7,7 @@ from sqlmodel import Session, SQLModel, select
 from app.auth import OwnerOnly
 from app.models import Book, Note, Quote, Shelf, utcnow
 from app.schemas import (
+    check_dates,
     BookCreate, BookRead, BookUpdate, NoteCreate, NoteRead, NoteUpdate, QuoteCreate, QuoteRead, QuoteUpdate,
 )
 
@@ -58,7 +59,12 @@ def create_book(payload: BookCreate, db: DB) -> Book:
 @router.patch("/books/{book_id}", response_model=BookRead, dependencies=[OwnerOnly])
 def update_book(book_id: int, payload: BookUpdate, db: DB) -> Book:
     book = _get_or_404(db, Book, book_id)
-    book.sqlmodel_update(payload.model_dump(exclude_unset=True))
+    changes = payload.model_dump(exclude_unset=True)
+    try:
+        check_dates(changes.get("started_at", book.started_at), changes.get("finished_at", book.finished_at))
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    book.sqlmodel_update(changes)
     book.updated_at = utcnow()
     return _save(db, book)
 
