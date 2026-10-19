@@ -1,0 +1,22 @@
+[project]
+name = "bookterm-api"
+version = "0.1.0"
+description = "bookterm REST API"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.143.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.uv]
+package = false
